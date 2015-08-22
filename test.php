@@ -9,10 +9,5 @@ error_reporting(-1);
   $rawPref_l = "";
 
   $newLink = $link->createLink($rawLong_url, $rawPref_l);
-  if($newLink){
-    echo $newLink;
-  }
-  else{
-    var_dump($newLink);
-  }
+  echo "http:l.brolaugh.com/".$newLink;
  ?>

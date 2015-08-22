@@ -3,9 +3,6 @@ class Link{
   private $mysqli;
   private $long_url;
   private $pref_l;
-  private $last_l;
-  private $new_l;
-  private $freeSpot;
 
   function __construct(){
     $this->freeSpot = false;
@@ -17,12 +14,10 @@ class Link{
       echo "didn't match paramenters";
       exit();
     }
-
     $stmt = $this->mysqli->prepare("SELECT long_url FROM links WHERE short_url = ?");
     $stmt->bind_param('s', $shortLink);
     $stmt->execute();
     $stmt->bind_result($longLink);
-
     if ($stmt->fetch()){
       $stmt->close();
       return $longLink;
@@ -35,72 +30,98 @@ class Link{
   public function createLink($rawLong_url, $rawPref_l){
     $this->long_url = $rawLong_url;
     $this->pref_l = $rawPref_l;
-
-    /*if(!preg_match("^((http[s]?|ftp):\/)?\/?([^:\/\s]+)((\/\w+)*\/)([\w\-\.]+[^#?\s]+)(.*)?(#[\w\-]+)?$", $this->longLink)){
-    header("Location:error.php?e=Original URL didn't fit");
-    exit();
-  }*/
-
-
-  require_once("classes/genstring.class.php");
-
   if(strlen($this->pref_l) != 0){
     if(!preg_match("/[a-zA-Z0-9]+/", $this->pref_l)){
       header("Location:error.php?e=Preffered link didn't match parameters");
       exit();
     }
-  }
-  else{
-    /*
-    check last rand link and generate new link
-    if link already is present generate new link
-
-    */
-    $stmt = $this->mysqli->prepare("SELECT short_url FROM links WHERE custom = 0 LIMIT 1");
-    $stmt->execute();
-    $stmt->bind_result($last_l);
-    $stmt->fetch();
-    echo $this->last_l;
-    $this->last_l = $last_l;
-    $stmt->close();
-
-    require_once("classes/genstring.class.php");
-    while(!$this->freeSpot){
-      $genString = new genString($this->last_l);
-      $genString->makeNewString();
-      $this->new_l = $genString->getNewString();
-
-      $stmt = $this->mysqli->prepare("SELECT short_url FROM links WHERE short_url = ?");
-      $stmt->bind_param('s', $this->new_l);
-      $stmt->execute();
-      $stmt->bind_result($temp);
-      echo "Test123";
-      if($stmt->fetch()) {
-        $this->freeSpot = true;
+    else{
+      if($this->IsShortLinkFree($this->rawLong_url)){
+        $this->insertLink();
       }
       else{
-        $stmt->bind_result($this->last_l);
-        $stmt->execute();
-        $stmt->close();
+        header("Location:error.php?e=Link was already in use.");
+        exit();
       }
     }
-    $this->insertLink();
-    /**/
-    return $this->new_l;
+  }
+  else{
+    if($shortLink = $this->isLongLinkUsed($this->long_url)){
+      return $shortLink;
+    }
+    else{
+      require_once("classes/genstring.class.php");
+      /*
+      check last rand link and generate new link
+      if link already is present generate new link
+      */
+      $this->last_l = $this->getLastLink();
+      $genString = new GenString($this->last_l);
+      $this->new_l = $genString->genStr();
+      while(!$this->IsShortLinkFree($this->new_l)){
+        $genString->reGen();
+      }
+      if($this->insertLink()){
+        return $this->new_l;
+      }
+      else{
+        return false;
+      }
+    }
+
   }
 }
-
+private function getLastLink(){
+  $stmt = $this->mysqli->prepare("SELECT short_url FROM links WHERE custom = 0 ORDER BY id DESC LIMIT 1");
+  $stmt->execute();
+  $stmt->bind_result($lastLink);
+  if($stmt->fetch()){
+    return $lastLink;
+  }
+  else{
+    return false;
+  }
+}
+private function IsShortLinkFree($shortLink){
+  $stmt = $this->mysqli->prepare("SELECT short_url FROM links WHERE short_url = ?");
+  $stmt->bind_param('s', $shortLink);
+  $stmt->execute();
+  $stmt->bind_result($temp);
+  if($stmt->fetch()){
+    return false;
+  }
+  else{
+    return true;
+  }
+}
+private function isLongLinkUsed($longLink){
+  $stmt = $this->mysqli->prepare("SELECT short_url FROM links WHERE long_url = ? AND custom = 0");
+  $stmt->bind_param('s', $longLink);
+  $stmt->execute();
+  $stmt->bind_result($shortLink);
+  if($stmt->fetch()){
+    return $shortLink;
+  }
+  else{
+    return false;
+  }
+}
 //This shit isn't working as it should.
 private function insertLink(){
   $stmt = $this->mysqli->prepare("INSERT INTO links(short_url, long_url, custom) VALUES(?,?,?);");
   echo "<pre>";
+  echo $this->mysqli->error;
 
-  var_dump($this->new_l);
-  var_dump($this->long_url);
   $temp = 0;
   $stmt->bind_param('ssi', $this->new_l, $this->long_url, $temp);
-  $stmt->execute();
-  $stmt->close();
+  if($stmt->execute()){
+    $stmt->close();
+    return true;
+  }
+  else{
+    $stmt->close();
+    return false;
+  }
 }
 }
 ?>

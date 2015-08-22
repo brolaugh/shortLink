@@ -57,13 +57,16 @@ class GenString{
         }
       }
   }
-  private function makeNewString(){
+  public function makeNewString(){
     $this->newString = substr_replace($this->oldString, "", -1).$this->newChar;
     //$this->printNewString();
   }
   //printNewString not working
   public function printNewString(){
     echo $this->newString;
+  }
+  public function getNewString(){
+    return $this->newString;
   }
 
 }
